@@ -83,6 +83,7 @@ impl ValidQuery for QueryBox {
             FindAssetsByDomainIdAndAssetDefinitionId(query) => query.execute_into_value(wsv),
             FindAssetQuantityById(query) => query.execute_into_value(wsv),
             FindAllDomains(query) => query.execute_into_value(wsv),
+            FindSomeDomains(query) => query.execute_into_value(wsv),
             FindDomainById(query) => query.execute_into_value(wsv),
             FindDomainKeyValueByIdAndKey(query) => query.execute_into_value(wsv),
             FindAllPeers(query) => query.execute_into_value(wsv),

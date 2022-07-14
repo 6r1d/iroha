@@ -35,6 +35,9 @@ impl IsAllowed<QueryBox> for OnlyAccountsDomain {
             FindAllDomains(_) => Err("Only access to the domain of the account is permitted."
                 .to_owned()
                 .into()),
+            FindSomeDomains(_) => Err("Only access to the domain of the account is permitted."
+                .to_owned()
+                .into()),
             FindAllRoles(_) => Err("Only access to roles of the same domain is permitted."
                 .to_owned()
                 .into()),
@@ -363,6 +366,7 @@ impl IsAllowed<QueryBox> for OnlyAccountsData {
                     Err("Other accounts are private.".to_owned().into())
                 }
                 | FindAllDomains(_)
+                | FindSomeDomains(_)
                 | FindDomainById(_)
                 | FindDomainKeyValueByIdAndKey(_) => {
                     Err("Only access to your account's data is permitted.".to_owned().into())

@@ -1,5 +1,8 @@
 //! This module contains [`Domain`] structure and related implementations and trait implementations.
 
+use rand::thread_rng;
+use rand::seq::SliceRandom;
+
 use eyre::Result;
 use iroha_data_model::prelude::*;
 use iroha_telemetry::metrics;
@@ -272,6 +275,20 @@ pub mod query {
                 .iter()
                 .map(|guard| guard.value().clone())
                 .collect())
+        }
+    }
+
+    impl ValidQuery for FindSomeDomains {
+        #[metrics(+"find_some_domains")]
+        fn execute(&self, wsv: &WorldStateView) -> Result<Self::Output, Error> {
+            let domains_tmp: Vec<Domain> = wsv.domains().iter()
+                                              .map(|guard| guard.value().clone())
+                                              .collect();
+            let domain_count : usize = if domains_tmp.len() <= 1 { 1 }
+                                       else { domains_tmp.len() / 2 };
+            let domains = domains_tmp.choose_multiple(&mut thread_rng(), domain_count)
+                                     .cloned().collect();
+            Ok(domains)
         }
     }
 

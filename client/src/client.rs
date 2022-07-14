@@ -1118,6 +1118,11 @@ pub mod domain {
         FindAllDomains::new()
     }
 
+    /// Get query to get some domains
+    pub const fn some() -> FindSomeDomains {
+        FindSomeDomains::new()
+    }
+
     /// Get query to get all domain by id
     pub fn by_id(domain_id: impl Into<EvaluatesTo<DomainId>>) -> FindDomainById {
         FindDomainById::new(domain_id)

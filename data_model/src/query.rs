@@ -75,6 +75,8 @@ pub enum QueryBox {
     FindAssetDefinitionKeyValueByIdAndKey(FindAssetDefinitionKeyValueByIdAndKey),
     /// [`FindAllDomains`] variant.
     FindAllDomains(FindAllDomains),
+    /// [`FindSomeDomains`] variant.
+    FindSomeDomains(FindSomeDomains),
     /// [`FindDomainById`] variant.
     FindDomainById(FindDomainById),
     /// [`FindDomainKeyValueByIdAndKey`] variant.
@@ -1076,6 +1078,28 @@ pub mod domain {
         type Output = Vec<Domain>;
     }
 
+    /// `FindSomeDomains` Iroha Query will find all `Domain`s presented in Iroha `Peer`.
+    #[derive(
+        Debug,
+        Clone,
+        Copy,
+        Default,
+        PartialEq,
+        Eq,
+        Decode,
+        Encode,
+        Deserialize,
+        Serialize,
+        IntoSchema,
+        PartialOrd,
+        Ord,
+    )]
+    pub struct FindSomeDomains;
+
+    impl Query for FindSomeDomains {
+        type Output = Vec<Domain>;
+    }
+
     /// `FindDomainById` Iroha Query will find a `Domain` by it's identification in Iroha `Peer`.
     #[derive(
         Debug,
@@ -1103,6 +1127,13 @@ pub mod domain {
         /// Construct [`FindAllDomains`].
         pub const fn new() -> Self {
             FindAllDomains
+        }
+    }
+
+    impl FindSomeDomains {
+        /// Construct [`FindSomeDomains`].
+        pub const fn new() -> Self {
+            FindSomeDomains
         }
     }
 
@@ -1154,7 +1185,7 @@ pub mod domain {
 
     /// The prelude re-exports most commonly used traits, structs and macros from this crate.
     pub mod prelude {
-        pub use super::{FindAllDomains, FindDomainById, FindDomainKeyValueByIdAndKey};
+        pub use super::{FindAllDomains, FindSomeDomains, FindDomainById, FindDomainKeyValueByIdAndKey};
     }
 }
 
