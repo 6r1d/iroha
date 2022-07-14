@@ -264,6 +264,12 @@ impl Domain {
 
 #[cfg(feature = "mutable_api")]
 impl Domain {
+    /// Return a copy of the id property of the current domain
+    #[inline]
+    pub fn get_id(self,) -> Id {
+        self.id.clone()
+    }
+
     /// Return a mutable reference to the [`Account`] corresponding to the account id.
     #[inline]
     pub fn account_mut(
