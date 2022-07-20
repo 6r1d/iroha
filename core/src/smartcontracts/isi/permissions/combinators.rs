@@ -172,6 +172,7 @@ impl IsAllowed<Instruction> for CheckNested {
             Instruction::Register(_)
             | Instruction::Unregister(_)
             | Instruction::Mint(_)
+            | Instruction::MintOne(_)
             | Instruction::Burn(_)
             | Instruction::SetKeyValue(_)
             | Instruction::RemoveKeyValue(_)

@@ -36,6 +36,8 @@ pub enum Instruction {
     Unregister(UnregisterBox),
     /// `Mint` variant.
     Mint(MintBox),
+    /// `MintOne` variant.
+    MintOne(MintOneBox),
     /// `Burn` variant.
     Burn(BurnBox),
     /// `Transfer` variant.
@@ -69,6 +71,7 @@ impl Instruction {
             Register(register_box) => register_box.len(),
             Unregister(unregister_box) => unregister_box.len(),
             Mint(mint_box) => mint_box.len(),
+            MintOne(mint_one_box) => mint_one_box.len(),
             Burn(burn_box) => burn_box.len(),
             Transfer(transfer_box) => transfer_box.len(),
             If(if_box) => if_box.len(),
@@ -136,6 +139,18 @@ pub struct UnregisterBox {
 )]
 #[display(fmt = "MINT {object:?} TO {destination_id:?}")] // TODO: Display
 pub struct MintBox {
+    /// Object to mint.
+    pub object: EvaluatesTo<Value>,
+    /// Entity to mint to.
+    pub destination_id: EvaluatesTo<IdBox>,
+}
+
+/// Sized structure for all possible MintOnes.
+#[derive(
+    Debug, Display, Clone, PartialEq, Eq, Decode, Encode, Deserialize, Serialize, IntoSchema,
+)]
+#[display(fmt = "MINT ONE {object:?} TO {destination_id:?}")] // TODO: Display
+pub struct MintOneBox {
     /// Object to mint.
     pub object: EvaluatesTo<Value>,
     /// Entity to mint to.
@@ -302,6 +317,19 @@ where
 /// Generic instruction for a mint of an object to the identifiable destination.
 #[derive(Debug, Clone, Decode, Encode, Deserialize, Serialize)]
 pub struct Mint<D, O>
+where
+    D: Identifiable,
+    O: Into<Value>,
+{
+    /// Object which should be minted.
+    pub object: O,
+    /// Destination object [`Identifiable::Id`].
+    pub destination_id: D::Id,
+}
+
+/// Generic instruction for minting of a single object to the identifiable destination.
+#[derive(Debug, Clone, Decode, Encode, Deserialize, Serialize)]
+pub struct MintOne<D, O>
 where
     D: Identifiable,
     O: Into<Value>,
@@ -650,6 +678,25 @@ impl MintBox {
     }
 }
 
+impl MintOneBox {
+    /// Length of contained instructions and queries.
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.destination_id.len() + self.object.len() + 1
+    }
+
+    /// Construct [`MintOneBox`].
+    pub fn new<O: Into<EvaluatesTo<Value>>, D: Into<EvaluatesTo<IdBox>>>(
+        object: O,
+        destination_id: D,
+    ) -> Self {
+        Self {
+            object: object.into(),
+            destination_id: destination_id.into(),
+        }
+    }
+}
+
 impl BurnBox {
     /// Length of contained instructions and queries.
     #[inline]
@@ -851,7 +898,7 @@ mod tests {
 pub mod prelude {
     pub use super::{
         Burn, BurnBox, ExecuteTriggerBox, FailBox, Grant, GrantBox, If as IfInstruction,
-        Instruction, Mint, MintBox, Pair, Register, RegisterBox, RemoveKeyValue, RemoveKeyValueBox,
+        Instruction, Mint, MintBox, MintOne, MintOneBox, Pair, Register, RegisterBox, RemoveKeyValue, RemoveKeyValueBox,
         Revoke, RevokeBox, SequenceBox, SetKeyValue, SetKeyValueBox, Transfer, TransferBox,
         Unregister, UnregisterBox,
     };
