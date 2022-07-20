@@ -149,9 +149,9 @@ pub mod isi {
     impl_mint!(u128, "mint_big_qty");
     impl_mint!(Fixed, "mint_fixed");
 
-    impl_mint_one!(u32, "mint_qty");
-    impl_mint_one!(u128, "mint_big_qty");
-    impl_mint_one!(Fixed, "mint_fixed");
+    impl_mint_one!(u32, "mint_one_qty");
+    impl_mint_one!(u128, "mint_one_big_qty");
+    impl_mint_one!(Fixed, "mint_one_fixed");
 
     impl_burn!(u32, "burn_qty");
     impl_burn!(u128, "burn_big_qty");
