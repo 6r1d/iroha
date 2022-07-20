@@ -58,6 +58,8 @@ pub enum Instruction {
     Revoke(RevokeBox),
     /// `ExecuteTrigger` variant.
     ExecuteTrigger(ExecuteTriggerBox),
+    /// `Increment` variant.
+    Increment(IncrementBox),
 }
 
 impl Instruction {
@@ -80,6 +82,7 @@ impl Instruction {
             Grant(grant_box) => grant_box.len(),
             Revoke(revoke_box) => revoke_box.len(),
             ExecuteTrigger(execute_trigger) => execute_trigger.len(),
+            Increment(increment) => increment.len(),
         }
     }
 }
@@ -140,6 +143,16 @@ pub struct MintBox {
     pub object: EvaluatesTo<Value>,
     /// Entity to mint to.
     pub destination_id: EvaluatesTo<IdBox>,
+}
+
+/// Sized structure for all possible `Increment`s.
+#[derive(
+    Debug, Display, Clone, PartialEq, Eq, Decode, Encode, Deserialize, Serialize, IntoSchema,
+)]
+#[display(fmt = "Increment {object:?}")] // TODO: Display
+pub struct IncrementBox {
+    /// Object to increment.
+    pub object: EvaluatesTo<Value>,
 }
 
 /// Sized structure for all possible Burns.
@@ -310,6 +323,16 @@ where
     pub object: O,
     /// Destination object [`Identifiable::Id`].
     pub destination_id: D::Id,
+}
+
+/// Generic instruction for incrementing an object.
+#[derive(Debug, Clone, Decode, Encode, Deserialize, Serialize)]
+pub struct Increment<O>
+where
+    O: Into<Value>,
+{
+    /// Object which should be incremented.
+    pub object: O,
 }
 
 /// Generic instruction for a burn of an object to the identifiable destination.
@@ -650,6 +673,23 @@ impl MintBox {
     }
 }
 
+impl IncrementBox {
+    /// Length of contained instructions and queries.
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.object.len() + 1
+    }
+
+    /// Construct [`IncrementBox`].
+    pub fn new<O: Into<EvaluatesTo<Value>>>(
+        object: O,
+    ) -> Self {
+        Self {
+            object: object.into(),
+        }
+    }
+}
+
 impl BurnBox {
     /// Length of contained instructions and queries.
     #[inline]
@@ -851,7 +891,7 @@ mod tests {
 pub mod prelude {
     pub use super::{
         Burn, BurnBox, ExecuteTriggerBox, FailBox, Grant, GrantBox, If as IfInstruction,
-        Instruction, Mint, MintBox, Pair, Register, RegisterBox, RemoveKeyValue, RemoveKeyValueBox,
+        Instruction, Mint, MintBox, Increment, IncrementBox, Pair, Register, RegisterBox, RemoveKeyValue, RemoveKeyValueBox,
         Revoke, RevokeBox, SequenceBox, SetKeyValue, SetKeyValueBox, Transfer, TransferBox,
         Unregister, UnregisterBox,
     };

@@ -238,6 +238,7 @@ impl Execute for Instruction {
             Grant(grant_box) => grant_box.execute(authority, wsv),
             Revoke(revoke_box) => revoke_box.execute(authority, wsv),
             ExecuteTrigger(execute_trigger) => execute_trigger.execute(authority, wsv),
+            Increment(increment) => increment.execute(authority, wsv),
         }
     }
 }

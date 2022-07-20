@@ -194,6 +194,8 @@ impl IsAllowed<Instruction> for CheckNested {
                 .instructions
                 .iter()
                 .try_for_each(|this_instruction| self.check(authority, this_instruction, wsv)),
+            Instruction::Increment(increment) => self
+                .check(authority, &increment.object, wsv)
         }
     }
 }

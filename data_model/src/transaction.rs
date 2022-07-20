@@ -598,6 +598,7 @@ impl Display for InstructionExecutionFail {
             Grant(_) => "grant",
             Revoke(_) => "revoke",
             ExecuteTrigger(_) => "execute trigger",
+            Increment(_) => "increment",
         };
         write!(
             f,
