@@ -588,6 +588,7 @@ impl Display for InstructionExecutionFail {
             Fail(_) => "fail",
             If(_) => "if",
             Mint(_) => "mint",
+            MintOne(_) => "mint_one",
             Pair(_) => "pair",
             Register(_) => "register",
             Sequence(_) => "sequence",

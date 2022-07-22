@@ -227,6 +227,7 @@ impl Execute for Instruction {
             Register(register_box) => register_box.execute(authority, wsv),
             Unregister(unregister_box) => unregister_box.execute(authority, wsv),
             Mint(mint_box) => mint_box.execute(authority, wsv),
+            MintOne(mint_one_box) => mint_one_box.execute(authority, wsv),
             Burn(burn_box) => burn_box.execute(authority, wsv),
             Transfer(transfer_box) => transfer_box.execute(authority, wsv),
             If(if_box) => if_box.execute(authority, wsv),
@@ -297,6 +298,43 @@ impl Execute for UnregisterBox {
 }
 
 impl Execute for MintBox {
+    type Error = Error;
+
+    fn execute(
+        self,
+        authority: <Account as Identifiable>::Id,
+        wsv: &WorldStateView,
+    ) -> Result<(), Self::Error> {
+        let context = Context::new();
+        let destination_id = self.destination_id.evaluate(wsv, &context)?;
+        let object = self.object.evaluate(wsv, &context)?;
+        iroha_logger::trace!(%destination_id, ?object, %authority);
+        match (destination_id, object) {
+            (IdBox::AssetId(asset_id), Value::U32(quantity)) => {
+                Mint::<Asset, u32>::new(quantity, asset_id).execute(authority, wsv)
+            }
+            (IdBox::AssetId(asset_id), Value::U128(quantity)) => {
+                Mint::<Asset, u128>::new(quantity, asset_id).execute(authority, wsv)
+            }
+            (IdBox::AssetId(asset_id), Value::Fixed(quantity)) => {
+                Mint::<Asset, Fixed>::new(quantity, asset_id).execute(authority, wsv)
+            }
+            (IdBox::AccountId(account_id), Value::PublicKey(public_key)) => {
+                Mint::<Account, PublicKey>::new(public_key, account_id).execute(authority, wsv)
+            }
+            (IdBox::AccountId(account_id), Value::SignatureCheckCondition(condition)) => {
+                Mint::<Account, SignatureCheckCondition>::new(condition, account_id)
+                    .execute(authority, wsv)
+            }
+            (IdBox::TriggerId(trigger_id), Value::U32(quantity)) => {
+                Mint::<Trigger<FilterBox>, u32>::new(quantity, trigger_id).execute(authority, wsv)
+            }
+            _ => Err(Error::Unsupported(InstructionType::Mint)),
+        }
+    }
+}
+
+impl Execute for MintOneBox {
     type Error = Error;
 
     fn execute(

@@ -88,6 +88,25 @@ pub mod isi {
         };
     }
 
+    macro_rules! impl_mint_one {
+        ($ty:ty, $metrics:literal) => {
+            impl InnerMintOne for $ty {}
+
+            impl Execute for MintOne<Asset, $ty> {
+                type Error = Error;
+
+                #[metrics(+$metrics)]
+                fn execute(
+                    self,
+                    authority: AccountId,
+                    wsv: &WorldStateView,
+                ) -> Result<(), Self::Error> {
+                    <$ty as InnerMintOne>::execute(self, authority, wsv)
+                }
+            }
+        };
+    }
+
     macro_rules! impl_burn {
         ($ty:ty, $metrics:literal) => {
             impl InnerBurn for $ty {}
@@ -130,6 +149,10 @@ pub mod isi {
     impl_mint!(u128, "mint_big_qty");
     impl_mint!(Fixed, "mint_fixed");
 
+    impl_mint_one!(u32, "mint_one_qty");
+    impl_mint_one!(u128, "mint_one_big_qty");
+    impl_mint_one!(Fixed, "mint_one_fixed");
+
     impl_burn!(u32, "burn_qty");
     impl_burn!(u128, "burn_big_qty");
     impl_burn!(Fixed, "burn_fixed");
@@ -142,6 +165,47 @@ pub mod isi {
     trait InnerMint {
         fn execute<Err>(
             mint: Mint<Asset, Self>,
+            _authority: <Account as Identifiable>::Id,
+            wsv: &WorldStateView,
+        ) -> Result<(), Err>
+        where
+            Self: AssetInstructionInfo + CheckedOp + IntoMetric + Copy,
+            AssetValue: From<Self> + TryAsMut<Self>,
+            Value: From<Self>,
+            <AssetValue as TryAsMut<Self>>::Error: std::error::Error + Send + Sync + 'static,
+            Err: From<Error>,
+        {
+            let asset_id = mint.destination_id;
+
+            assert_can_mint(
+                &asset_id.definition_id,
+                wsv,
+                <Self as AssetInstructionInfo>::EXPECTED_VALUE_TYPE,
+            )?;
+            wsv.asset_or_insert(
+                &asset_id,
+                <Self as AssetInstructionInfo>::DEFAULT_ASSET_VALUE,
+            )?;
+            wsv.modify_asset(&asset_id, |asset| {
+                let quantity: &mut Self = asset
+                    .try_as_mut()
+                    .map_err(eyre::Error::from)
+                    .map_err(|e| Error::Conversion(e.to_string()))?;
+                *quantity = quantity
+                    .checked_add(mint.object)
+                    .ok_or(MathError::Overflow)?;
+                wsv.metrics.tx_amounts.observe((*quantity).into_metric());
+
+                Ok(AssetEvent::Added(asset_id.clone()))
+            })?;
+            Ok(())
+        }
+    }
+
+    /// Trait for blanket mint_one implementation.
+    trait InnerMintOne {
+        fn execute<Err>(
+            mint: MintOne<Asset, Self>,
             _authority: <Account as Identifiable>::Id,
             wsv: &WorldStateView,
         ) -> Result<(), Err>
