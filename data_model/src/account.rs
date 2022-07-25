@@ -13,12 +13,15 @@ use std::collections::{btree_map, btree_set};
 
 use derive_more::Display;
 use getset::{Getters, MutGetters, Setters};
-#[cfg(feature = "ffi_api")]
-use iroha_ffi::ffi_bindgen;
+use iroha_data_model_derive::IdOrdEqHash;
+#[cfg(feature = "ffi")]
+use iroha_ffi::{ffi_export, IntoFfi, TryFromFfi};
 use iroha_schema::IntoSchema;
 use parity_scale_codec::{Decode, Encode};
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "mutable_api")]
+use crate::Registrable;
 use crate::{
     asset::{prelude::AssetId, AssetsMap},
     domain::prelude::*,
@@ -80,14 +83,15 @@ impl From<GenesisAccount> for Account {
     Clone,
     PartialEq,
     Eq,
+    PartialOrd,
+    Ord,
     Decode,
     Encode,
     Deserialize,
     Serialize,
     IntoSchema,
-    PartialOrd,
-    Ord,
 )]
+#[cfg_attr(feature = "ffi", derive(IntoFfi, TryFromFfi))]
 pub struct SignatureCheckCondition(pub EvaluatesTo<bool>);
 
 impl SignatureCheckCondition {
@@ -124,37 +128,36 @@ impl Default for SignatureCheckCondition {
 /// Builder which should be submitted in a transaction to create a new [`Account`]
 #[allow(clippy::multiple_inherent_impl)]
 #[derive(
-    Debug, Display, Clone, PartialEq, Eq, Decode, Encode, Deserialize, Serialize, IntoSchema,
+    Debug, Display, Clone, IdOrdEqHash, Decode, Encode, Deserialize, Serialize, IntoSchema,
 )]
+#[cfg_attr(feature = "ffi", derive(IntoFfi, TryFromFfi))]
 #[display(fmt = "[{id}]")]
+#[id(type = "<Account as Identifiable>::Id")]
 pub struct NewAccount {
     /// Identification
-    id: <NewAccount as Identifiable>::Id,
+    id: <Account as Identifiable>::Id,
     /// Signatories, i.e. signatures attached to this message.
     signatories: Signatories,
     /// Metadata that should be submitted with the builder
     metadata: Metadata,
 }
 
-impl Identifiable for NewAccount {
-    type Id = <Account as Identifiable>::Id;
+#[cfg(feature = "mutable_api")]
+impl Registrable for NewAccount {
+    type Target = Account;
 
-    fn id(&self) -> &Self::Id {
-        &self.id
-    }
-}
-
-impl PartialOrd for NewAccount {
+    #[must_use]
     #[inline]
-    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for NewAccount {
-    #[inline]
-    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
-        self.id.cmp(&other.id)
+    fn build(self) -> Self::Target {
+        Self::Target {
+            id: self.id,
+            signatories: self.signatories,
+            assets: AssetsMap::default(),
+            permission_tokens: Permissions::default(),
+            signature_check_condition: SignatureCheckCondition::default(),
+            metadata: self.metadata,
+            roles: RoleIds::default(),
+        }
     }
 }
 
@@ -176,23 +179,13 @@ impl NewAccount {
         }
     }
 
-    /// Construct [`Account`]
-    #[must_use]
-    #[cfg(feature = "mutable_api")]
-    pub fn build(self) -> Account {
-        Account {
-            id: self.id,
-            signatories: self.signatories,
-            assets: AssetsMap::default(),
-            permission_tokens: Permissions::default(),
-            signature_check_condition: SignatureCheckCondition::default(),
-            metadata: self.metadata,
-            roles: RoleIds::default(),
-        }
+    /// Identification
+    pub(crate) fn id(&self) -> &<Account as Identifiable>::Id {
+        &self.id
     }
 }
 
-#[cfg_attr(feature = "ffi_api", ffi_bindgen)]
+#[cfg_attr(feature = "ffi", ffi_export)]
 impl NewAccount {
     /// Add [`Metadata`] to the account replacing previously defined
     #[must_use]
@@ -207,8 +200,7 @@ impl NewAccount {
     Debug,
     Display,
     Clone,
-    PartialEq,
-    Eq,
+    IdOrdEqHash,
     Getters,
     MutGetters,
     Setters,
@@ -218,9 +210,10 @@ impl NewAccount {
     Serialize,
     IntoSchema,
 )]
-#[allow(clippy::multiple_inherent_impl)]
-#[cfg_attr(feature = "ffi_api", ffi_bindgen)]
+#[cfg_attr(feature = "ffi", derive(IntoFfi, TryFromFfi))]
 #[display(fmt = "({id})")] // TODO: Add more?
+#[id(type = "Id")]
+#[allow(clippy::multiple_inherent_impl)]
 pub struct Account {
     /// An Identification of the [`Account`].
     id: <Self as Identifiable>::Id,
@@ -231,21 +224,14 @@ pub struct Account {
     /// Permissions tokens of this account
     permission_tokens: Permissions,
     /// Condition which checks if the account has the right signatures.
-    #[cfg_attr(feature = "mutable_api", getset(get = "pub", set = "pub"))]
+    #[getset(get = "pub")]
+    #[cfg_attr(feature = "mutable_api", getset(set = "pub"))]
     signature_check_condition: SignatureCheckCondition,
     /// Metadata of this account as a key-value store.
     #[cfg_attr(feature = "mutable_api", getset(get_mut = "pub"))]
     metadata: Metadata,
     /// Roles of this account, they are tags for sets of permissions stored in `World`.
     roles: RoleIds,
-}
-
-impl Identifiable for Account {
-    type Id = Id;
-
-    fn id(&self) -> &Self::Id {
-        &self.id
-    }
 }
 
 impl HasMetadata for Account {
@@ -258,21 +244,7 @@ impl Registered for Account {
     type With = NewAccount;
 }
 
-impl PartialOrd for Account {
-    #[inline]
-    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for Account {
-    #[inline]
-    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
-        self.id().cmp(other.id())
-    }
-}
-
-#[cfg_attr(feature = "ffi_api", ffi_bindgen)]
+#[cfg_attr(feature = "ffi", ffi_export)]
 impl Account {
     /// Construct builder for [`Account`] identifiable by [`Id`] containing the given signatories.
     #[must_use]
@@ -431,6 +403,7 @@ impl FromIterator<Account> for crate::Value {
     Serialize,
     IntoSchema,
 )]
+#[cfg_attr(feature = "ffi", derive(IntoFfi, TryFromFfi))]
 #[display(fmt = "{name}@{domain_id}")]
 pub struct Id {
     /// [`Account`]'s name.

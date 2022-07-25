@@ -15,17 +15,21 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use core::{fmt, fmt::Debug, ops::RangeInclusive};
+use core::{convert::AsRef, fmt, fmt::Debug, ops::RangeInclusive};
 
-use block_value::BlockValue;
-use derive_more::Display;
+use block_value::{BlockHeaderValue, BlockValue};
+#[cfg(not(target_arch = "aarch64"))]
+use derive_more::Into;
+use derive_more::{AsRef, Deref, Display, From};
 use events::FilterBox;
 use iroha_crypto::{Hash, PublicKey};
-use iroha_data_primitives::small::SmallVec;
-pub use iroha_data_primitives::{self as primitives, fixed, small};
+#[cfg(feature = "ffi")]
+use iroha_ffi::{IntoFfi, TryFromFfi};
 use iroha_macro::{error::ErrorTryFromEnum, FromVariant};
-use iroha_schema::IntoSchema;
+use iroha_primitives::{fixed, small, small::SmallVec};
+use iroha_schema::{IntoSchema, MetaMap};
 use parity_scale_codec::{Decode, Encode};
+use prelude::TransactionQueryResult;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -190,14 +194,6 @@ pub enum IdBox {
     RoleId(<role::Role as Identifiable>::Id),
 }
 
-impl Identifiable for IdBox {
-    type Id = Self;
-
-    fn id(&self) -> &Self::Id {
-        self
-    }
-}
-
 /// Sized container for constructors of all [`Identifiable`]s that can be registered via transaction
 #[derive(
     Debug, Clone, PartialEq, Eq, Decode, Encode, Deserialize, Serialize, FromVariant, IntoSchema,
@@ -290,16 +286,18 @@ pub type ValueBox = Box<Value>;
     Clone,
     PartialEq,
     Eq,
+    PartialOrd,
+    Ord,
     Decode,
     Encode,
     Deserialize,
     Serialize,
     FromVariant,
     IntoSchema,
-    PartialOrd,
-    Ord,
 )]
+#[cfg_attr(feature = "ffi", derive(IntoFfi, TryFromFfi))]
 #[allow(clippy::enum_variant_names)]
+#[repr(u8)]
 pub enum Value {
     /// [`u32`] integer.
     U32(u32),
@@ -333,12 +331,77 @@ pub enum Value {
     SignatureCheckCondition(SignatureCheckCondition),
     /// Committed or rejected transactions
     TransactionValue(TransactionValue),
+    /// Transaction Query
+    TransactionQueryResult(TransactionQueryResult),
     /// [`PermissionToken`].
     PermissionToken(PermissionToken),
     /// [`struct@Hash`]
     Hash(Hash),
     /// Block
-    Block(BlockValue),
+    Block(BlockValueWrapper),
+    /// Block headers
+    BlockHeader(BlockHeaderValue),
+}
+
+/// Cross-platform wrapper for `BlockValue`.
+#[cfg(not(target_arch = "aarch64"))]
+#[derive(
+    AsRef,
+    Clone,
+    Debug,
+    Decode,
+    Deref,
+    Deserialize,
+    Encode,
+    Eq,
+    From,
+    Into,
+    Ord,
+    PartialEq,
+    PartialOrd,
+    Serialize,
+)]
+#[serde(transparent)]
+pub struct BlockValueWrapper(BlockValue);
+
+/// Cross-platform wrapper for `BlockValue`.
+#[cfg(target_arch = "aarch64")]
+#[derive(
+    AsRef,
+    Clone,
+    Debug,
+    Decode,
+    Deref,
+    Deserialize,
+    Encode,
+    Eq,
+    From,
+    Ord,
+    PartialEq,
+    PartialOrd,
+    Serialize,
+)]
+#[as_ref(forward)]
+#[deref(forward)]
+#[from(forward)]
+#[serde(transparent)]
+pub struct BlockValueWrapper(Box<BlockValue>);
+
+#[cfg(target_arch = "aarch64")]
+impl From<BlockValueWrapper> for BlockValue {
+    fn from(block_value: BlockValueWrapper) -> Self {
+        *block_value.0
+    }
+}
+
+impl IntoSchema for BlockValueWrapper {
+    fn type_name() -> String {
+        BlockValue::type_name()
+    }
+
+    fn schema(map: &mut MetaMap) {
+        BlockValue::schema(map);
+    }
 }
 
 impl fmt::Display for Value {
@@ -367,9 +430,11 @@ impl fmt::Display for Value {
             Value::Parameter(v) => fmt::Display::fmt(&v, f),
             Value::SignatureCheckCondition(v) => fmt::Display::fmt(&v, f),
             Value::TransactionValue(_) => write!(f, "TransactionValue"),
+            Value::TransactionQueryResult(_) => write!(f, "TransactionQueryResult"),
             Value::PermissionToken(v) => fmt::Display::fmt(&v, f),
             Value::Hash(v) => fmt::Display::fmt(&v, f),
-            Value::Block(v) => fmt::Display::fmt(&v, f),
+            Value::Block(v) => fmt::Display::fmt(&**v, f),
+            Value::BlockHeader(v) => fmt::Display::fmt(&v, f),
         }
     }
 }
@@ -381,13 +446,32 @@ impl Value {
         use Value::*;
 
         match self {
-            U32(_) | U128(_) | Id(_) | PublicKey(_) | Bool(_) | Parameter(_) | Identifiable(_)
-            | String(_) | Name(_) | Fixed(_) | TransactionValue(_) | PermissionToken(_)
-            | Hash(_) | Block(_) => 1_usize,
+            U32(_)
+            | U128(_)
+            | Id(_)
+            | PublicKey(_)
+            | Bool(_)
+            | Parameter(_)
+            | Identifiable(_)
+            | String(_)
+            | Name(_)
+            | Fixed(_)
+            | TransactionValue(_)
+            | TransactionQueryResult(_)
+            | PermissionToken(_)
+            | Hash(_)
+            | Block(_)
+            | BlockHeader(_) => 1_usize,
             Vec(v) => v.iter().map(Self::len).sum::<usize>() + 1_usize,
             LimitedMetadata(data) => data.nested_len() + 1_usize,
             SignatureCheckCondition(s) => s.0.len(),
         }
+    }
+}
+
+impl From<BlockValue> for Value {
+    fn from(block_value: BlockValue) -> Self {
+        Value::Block(block_value.into())
     }
 }
 
@@ -600,6 +684,18 @@ where
     }
 }
 
+impl TryFrom<Value> for BlockValue {
+    type Error = ErrorTryFromEnum<Value, Self>;
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        if let Value::Block(block_value) = value {
+            return Ok(block_value.into());
+        }
+
+        Err(Self::Error::default())
+    }
+}
+
 impl<A: small::Array> TryFrom<Value> for small::SmallVec<A>
 where
     Value: TryInto<A::Item>,
@@ -623,7 +719,7 @@ where
 /// and `PartialCmp` implementations.
 pub trait Identifiable: Debug {
     /// The type of the `Id` of the entity.
-    type Id: Into<IdBox> + fmt::Display + fmt::Debug + Clone + Eq + Ord;
+    type Id;
 
     /// Get reference to the type's `Id`. There should be no other
     /// inherent `impl` with the same name (e.g. `getset`).
@@ -646,6 +742,16 @@ pub trait Registered: Identifiable {
     /// would be empty, to save space you create a builder for it, and
     /// set `With` to the builder's type.
     type With: Into<RegistrableBox>;
+}
+
+/// Trait for proxy objects used for registration.
+#[cfg(feature = "mutable_api")]
+pub trait Registrable {
+    /// Constructed type
+    type Target;
+
+    /// Construct [`Self::Target`]
+    fn build(self) -> Self::Target;
 }
 
 /// Limits of length of the identifiers (e.g. in [`domain::Domain`], [`account::Account`], [`asset::AssetDefinition`]) in number of chars
@@ -688,8 +794,8 @@ pub fn current_time() -> core::time::Duration {
         .expect("Failed to get the current system time")
 }
 
-#[cfg(feature = "ffi_api")]
-mod ffi {
+#[cfg(feature = "ffi")]
+pub(crate) mod ffi {
     use iroha_ffi::{gen_ffi_impl, handles};
 
     use super::*;
@@ -702,13 +808,9 @@ mod ffi {
         permissions::PermissionToken,
         role::Role,
         Name,
-
-        iroha_crypto::PublicKey,
-        iroha_crypto::PrivateKey,
-        iroha_crypto::KeyPair
     }
 
-    gen_ffi_impl! { Clone:
+    gen_ffi_impl! { pub Clone:
         account::Account,
         asset::Asset,
         domain::Domain,
@@ -716,12 +818,8 @@ mod ffi {
         permissions::PermissionToken,
         role::Role,
         Name,
-
-        iroha_crypto::PublicKey,
-        iroha_crypto::PrivateKey,
-        iroha_crypto::KeyPair
     }
-    gen_ffi_impl! { Eq:
+    gen_ffi_impl! { pub Eq:
         account::Account,
         asset::Asset,
         domain::Domain,
@@ -729,22 +827,16 @@ mod ffi {
         permissions::PermissionToken,
         role::Role,
         Name,
-
-        iroha_crypto::PublicKey,
-        iroha_crypto::PrivateKey,
-        iroha_crypto::KeyPair
     }
-    gen_ffi_impl! { Ord:
+    gen_ffi_impl! { pub Ord:
         account::Account,
         asset::Asset,
         domain::Domain,
         permissions::PermissionToken,
         role::Role,
         Name,
-
-        iroha_crypto::PublicKey
     }
-    gen_ffi_impl! { Drop:
+    gen_ffi_impl! { pub Drop:
         account::Account,
         asset::Asset,
         domain::Domain,
@@ -752,10 +844,6 @@ mod ffi {
         permissions::PermissionToken,
         role::Role,
         Name,
-
-        iroha_crypto::PublicKey,
-        iroha_crypto::PrivateKey,
-        iroha_crypto::KeyPair
     }
 }
 
@@ -763,12 +851,13 @@ pub mod prelude {
     //! Prelude: re-export of most commonly used traits, structs and macros in this crate.
     #[cfg(feature = "std")]
     pub use super::current_time;
+    #[cfg(feature = "mutable_api")]
+    pub use super::Registrable;
     pub use super::{
         account::prelude::*,
         asset::prelude::*,
         block_value::prelude::*,
         domain::prelude::*,
-        fixed::prelude::*,
         name::prelude::*,
         pagination::{prelude::*, Pagination},
         peer::prelude::*,
@@ -779,7 +868,6 @@ pub mod prelude {
     };
     pub use crate::{
         events::prelude::*, expression::prelude::*, isi::prelude::*, metadata::prelude::*,
-        permissions::prelude::*, query::prelude::*, small, transaction::prelude::*,
-        trigger::prelude::*,
+        permissions::prelude::*, query::prelude::*, transaction::prelude::*, trigger::prelude::*,
     };
 }
