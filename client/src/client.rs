@@ -12,12 +12,12 @@ use iroha_core::smartcontracts::isi::query::Error as QueryError;
 use iroha_crypto::{HashOf, KeyPair};
 use iroha_data_model::{predicate::PredicateBox, prelude::*, query::SignedQueryRequest};
 use iroha_logger::prelude::*;
+use iroha_primitives::small::SmallStr;
 use iroha_telemetry::metrics::Status;
 use iroha_version::prelude::*;
 use parity_scale_codec::DecodeAll;
 use rand::Rng;
 use serde::de::DeserializeOwned;
-use small::SmallStr;
 
 use crate::{
     config::Configuration,
@@ -430,6 +430,55 @@ impl Client {
         Ok(hash)
     }
 
+    /// Submit the prebuilt transaction and wait until it is either rejected or committed.
+    /// If rejected, return the rejection reason.
+    ///
+    /// # Errors
+    /// Fails if sending a transaction to a peer fails or there is an error in the response
+    pub fn submit_transaction_blocking(
+        &self,
+        transaction: Transaction,
+    ) -> Result<HashOf<VersionedTransaction>> {
+        struct EventListenerInitialized;
+
+        let client = self.clone();
+        let (event_sender, event_receiver) = mpsc::channel();
+        let (init_sender, init_receiver) = mpsc::channel();
+        let hash = transaction.hash();
+        let _handle = thread::spawn(move || -> eyre::Result<()> {
+            let event_iterator = client
+                .listen_for_events(PipelineEventFilter::new().hash(hash.into()).into())
+                .wrap_err("Failed to establish event listener connection.")?;
+            init_sender
+                .send(EventListenerInitialized)
+                .wrap_err("Failed to send init message through init channel.")?;
+            for event in event_iterator.flatten() {
+                if let Event::Pipeline(this_event) = event {
+                    match this_event.status {
+                        PipelineStatus::Validating => {}
+                        PipelineStatus::Rejected(reason) => event_sender
+                            .send(Err(reason))
+                            .wrap_err("Failed to send the transaction through event channel.")?,
+                        PipelineStatus::Committed => event_sender
+                            .send(Ok(hash.transmute()))
+                            .wrap_err("Failed to send the transaction through event channel.")?,
+                    }
+                }
+            }
+            Ok(())
+        });
+        init_receiver
+            .recv()
+            .wrap_err("Failed to receive init message.")?;
+        self.submit_transaction(transaction)?;
+        event_receiver
+            .recv_timeout(self.transaction_status_timeout)
+            .map_or_else(
+                |err| Err(err).wrap_err("Timeout waiting for transaction status"),
+                |result| Ok(result?),
+            )
+    }
+
     /// Lower-level Instructions API entry point.
     ///
     /// Returns a tuple with a provided request builder, a hash of the transaction, and a response handler.
@@ -510,45 +559,8 @@ impl Client {
         instructions: impl IntoIterator<Item = Instruction>,
         metadata: UnlimitedMetadata,
     ) -> Result<HashOf<VersionedTransaction>> {
-        struct EventListenerInitialized;
-
-        let client = self.clone();
-        let (event_sender, event_receiver) = mpsc::channel();
-        let (init_sender, init_receiver) = mpsc::channel();
         let transaction = self.build_transaction(instructions.into(), metadata)?;
-        let hash = transaction.hash();
-        let _handle = thread::spawn(move || -> eyre::Result<()> {
-            let event_iterator = client
-                .listen_for_events(PipelineEventFilter::new().hash(hash.into()).into())
-                .wrap_err("Failed to establish event listener connection.")?;
-            init_sender
-                .send(EventListenerInitialized)
-                .wrap_err("Failed to send through init channel.")?;
-            for event in event_iterator.flatten() {
-                if let Event::Pipeline(this_event) = event {
-                    match this_event.status {
-                        PipelineStatus::Validating => {}
-                        PipelineStatus::Rejected(reason) => event_sender
-                            .send(Err(reason))
-                            .wrap_err("Failed to send through event channel.")?,
-                        PipelineStatus::Committed => event_sender
-                            .send(Ok(hash.transmute()))
-                            .wrap_err("Failed to send through event channel.")?,
-                    }
-                }
-            }
-            Ok(())
-        });
-        init_receiver
-            .recv()
-            .wrap_err("Failed to receive init message.")?;
-        self.submit_transaction(transaction)?;
-        event_receiver
-            .recv_timeout(self.transaction_status_timeout)
-            .map_or_else(
-                |err| Err(err).wrap_err("Timeout waiting for transaction status"),
-                |result| Ok(result?),
-            )
+        self.submit_transaction_blocking(transaction)
     }
 
     /// Lower-level Query API entry point. Prepares an http-request and returns it with an http-response handler.
@@ -1103,9 +1115,31 @@ pub mod asset {
         FindAssetsByAccountId::new(account_id)
     }
 
-    /// Get query to get all assets by account id
+    /// Get query to get an asset by its id
     pub fn by_id(asset_id: impl Into<EvaluatesTo<<Asset as Identifiable>::Id>>) -> FindAssetById {
         FindAssetById::new(asset_id)
+    }
+}
+
+pub mod block {
+    //! Module with queries related to blocks
+    use iroha_crypto::Hash;
+
+    use super::*;
+
+    /// Get query to find all blocks
+    pub const fn all() -> FindAllBlocks {
+        FindAllBlocks::new()
+    }
+
+    /// Get query to find all block headers
+    pub const fn all_headers() -> FindAllBlockHeaders {
+        FindAllBlockHeaders::new()
+    }
+
+    /// Get query to find block header by hash
+    pub fn header_by_hash(hash: impl Into<EvaluatesTo<Hash>>) -> FindBlockHeaderByHash {
+        FindBlockHeaderByHash::new(hash)
     }
 }
 
@@ -1246,7 +1280,6 @@ mod tests {
     #[cfg(test)]
     mod query_errors_handling {
         use http::Response;
-        use iroha_core::smartcontracts::permissions::error::DenialReason;
 
         use super::*;
 
@@ -1260,7 +1293,7 @@ mod tests {
                 ),
                 (
                     StatusCode::FORBIDDEN,
-                    QueryError::Permission(DenialReason::Custom("whatever".to_owned())),
+                    QueryError::Permission("whatever".to_owned()),
                 ),
                 (
                     StatusCode::NOT_FOUND,

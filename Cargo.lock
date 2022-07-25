@@ -1254,6 +1254,7 @@ checksum = "f73fe65f54d1e12b726f517d3e2135ca3125a437b6d998caf1962961f7172d9e"
 dependencies = [
  "futures-channel",
  "futures-core",
+ "futures-executor",
  "futures-io",
  "futures-sink",
  "futures-task",
@@ -1275,6 +1276,17 @@ name = "futures-core"
 version = "0.3.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0c09fd04b7e4073ac7156a9539b57a484a8ea920f79c7c675d05d289ab6110d3"
+
+[[package]]
+name = "futures-executor"
+version = "0.3.21"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9420b90cfa29e327d0429f19be13e7ddb68fa1cccb09d65e5706b8c7a749b8a6"
+dependencies = [
+ "futures-core",
+ "futures-task",
+ "futures-util",
+]
 
 [[package]]
 name = "futures-io"
@@ -1700,6 +1712,7 @@ dependencies = [
  "parity-scale-codec",
  "serde",
  "serde_json",
+ "serial_test",
  "test_network",
  "thiserror",
  "tokio",
@@ -1715,8 +1728,8 @@ dependencies = [
  "derive_more",
  "futures",
  "iroha_actor_derive",
- "iroha_data_primitives",
  "iroha_logger",
+ "iroha_primitives",
  "once_cell",
  "petgraph",
  "thiserror",
@@ -1763,6 +1776,7 @@ dependencies = [
  "iroha_data_model",
  "iroha_logger",
  "iroha_permissions_validators",
+ "iroha_primitives",
  "iroha_telemetry",
  "iroha_version",
  "parity-scale-codec",
@@ -1838,6 +1852,7 @@ dependencies = [
  "iroha_logger",
  "iroha_macro",
  "iroha_p2p",
+ "iroha_primitives",
  "iroha_schema",
  "iroha_telemetry",
  "iroha_version",
@@ -1863,6 +1878,7 @@ dependencies = [
  "hex",
  "hex-literal",
  "iroha_ffi",
+ "iroha_primitives",
  "iroha_schema",
  "openssl-sys",
  "parity-scale-codec",
@@ -1885,9 +1901,9 @@ dependencies = [
  "iroha_core",
  "iroha_crypto",
  "iroha_data_model_derive",
- "iroha_data_primitives",
  "iroha_ffi",
  "iroha_macro",
+ "iroha_primitives",
  "iroha_schema",
  "iroha_version",
  "parity-scale-codec",
@@ -1897,7 +1913,6 @@ dependencies = [
  "test_network",
  "thiserror",
  "tokio",
- "trybuild",
  "warp",
 ]
 
@@ -1908,22 +1923,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
-]
-
-[[package]]
-name = "iroha_data_primitives"
-version = "2.0.0-pre-rc.5"
-dependencies = [
- "derive_more",
- "fixnum",
- "iroha_macro",
- "iroha_schema",
- "parity-scale-codec",
- "serde",
- "serde_json",
- "smallstr",
- "smallvec",
- "thiserror",
 ]
 
 [[package]]
@@ -1949,6 +1948,7 @@ dependencies = [
 name = "iroha_ffi_derive"
 version = "2.0.0-pre-rc.5"
 dependencies = [
+ "derive_more",
  "getset",
  "iroha_ffi",
  "proc-macro-error",
@@ -2039,6 +2039,23 @@ dependencies = [
  "parity-scale-codec",
  "serde",
  "thiserror",
+]
+
+[[package]]
+name = "iroha_primitives"
+version = "2.0.0-pre-rc.5"
+dependencies = [
+ "derive_more",
+ "fixnum",
+ "iroha_macro",
+ "iroha_schema",
+ "parity-scale-codec",
+ "serde",
+ "serde_json",
+ "smallstr",
+ "smallvec",
+ "thiserror",
+ "trybuild",
 ]
 
 [[package]]
@@ -2611,7 +2628,7 @@ dependencies = [
  "iroha_core",
  "iroha_crypto",
  "iroha_data_model",
- "iroha_data_primitives",
+ "iroha_primitives",
  "iroha_schema",
  "iroha_schema_gen",
  "iroha_version",
@@ -3312,6 +3329,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "serial_test"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7eec42e7232e5ca56aa59d63af3c7f991fe71ee6a3ddd2d3480834cf3902b007"
+dependencies = [
+ "futures",
+ "lazy_static",
+ "log",
+ "parking_lot",
+ "serial_test_derive",
+]
+
+[[package]]
+name = "serial_test_derive"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f1b95bb2f4f624565e8fe8140c789af7e2082c0e0561b5a82a1b678baa9703dc"
+dependencies = [
+ "proc-macro-error",
+ "proc-macro2",
+ "quote",
+ "rustversion",
+ "syn",
+]
+
+[[package]]
 name = "sha-1"
 version = "0.9.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3591,6 +3634,7 @@ dependencies = [
  "iroha_data_model",
  "iroha_logger",
  "iroha_permissions_validators",
+ "iroha_primitives",
  "once_cell",
  "rand 0.8.5",
  "tempfile",
