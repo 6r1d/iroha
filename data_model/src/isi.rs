@@ -488,6 +488,20 @@ where
     }
 }
 
+impl<D, O> MintOne<D, O>
+where
+    D: Registered,
+    O: Into<Value>,
+{
+    /// Construct [`MintOne`].
+    pub fn new(object: O, destination_id: D::Id) -> Self {
+        MintOne {
+            object,
+            destination_id,
+        }
+    }
+}
+
 impl<D, O> Burn<D, O>
 where
     D: Registered,

@@ -350,25 +350,25 @@ impl Execute for MintOneBox {
         iroha_logger::trace!(%destination_id, ?object, %authority);
         match (destination_id, object) {
             (IdBox::AssetId(asset_id), Value::U32(quantity)) => {
-                Mint::<Asset, u32>::new(quantity, asset_id).execute(authority, wsv)
+                MintOne::<Asset, u32>::new(quantity, asset_id).execute(authority, wsv)
             }
             (IdBox::AssetId(asset_id), Value::U128(quantity)) => {
-                Mint::<Asset, u128>::new(quantity, asset_id).execute(authority, wsv)
+                MintOne::<Asset, u128>::new(quantity, asset_id).execute(authority, wsv)
             }
             (IdBox::AssetId(asset_id), Value::Fixed(quantity)) => {
-                Mint::<Asset, Fixed>::new(quantity, asset_id).execute(authority, wsv)
+                MintOne::<Asset, Fixed>::new(quantity, asset_id).execute(authority, wsv)
             }
             (IdBox::AccountId(account_id), Value::PublicKey(public_key)) => {
-                Mint::<Account, PublicKey>::new(public_key, account_id).execute(authority, wsv)
+                MintOne::<Account, PublicKey>::new(public_key, account_id).execute(authority, wsv)
             }
             (IdBox::AccountId(account_id), Value::SignatureCheckCondition(condition)) => {
-                Mint::<Account, SignatureCheckCondition>::new(condition, account_id)
+                MintOne::<Account, SignatureCheckCondition>::new(condition, account_id)
                     .execute(authority, wsv)
             }
             (IdBox::TriggerId(trigger_id), Value::U32(quantity)) => {
-                Mint::<Trigger<FilterBox>, u32>::new(quantity, trigger_id).execute(authority, wsv)
+                MintOne::<Trigger<FilterBox>, u32>::new(quantity, trigger_id).execute(authority, wsv)
             }
-            _ => Err(Error::Unsupported(InstructionType::Mint)),
+            _ => Err(Error::Unsupported(InstructionType::MintOne)),
         }
     }
 }

@@ -191,12 +191,12 @@ pub fn check_query_in_instruction(
                 ))
         }
         Instruction::MintOne(instruction) => {
-            check_query_in_expression(authority, &instruction.object.expression, wsv, validator)
+            check_query_in_expression(authority, &instruction.object.expression, wsv, query_judge)
                 .and(check_query_in_expression(
                     authority,
                     &instruction.destination_id.expression,
                     wsv,
-                    validator,
+                    query_judge,
                 ))
         }
         Instruction::Burn(instruction) => {
