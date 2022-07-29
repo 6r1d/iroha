@@ -396,6 +396,53 @@ impl IdentifiableBox {
 pub type ValueBox = Box<Value>;
 
 /// Sized container for all possible values.
+/// 
+/// Example for a U32 value:
+/// ```rust
+/// use iroha_data_model::Value;
+/// let test_u32_val = Value::U32(1234);
+/// ```
+/// 
+/// Example for a U128 value:
+/// ```rust
+/// use iroha_data_model::Value;
+/// let test_u128_val = Value::U128(1234);
+/// ```
+/// 
+/// Example for a Bool value:
+/// ```rust
+/// use iroha_data_model::Value;
+/// let test_bool_val = Value::Bool(true);
+/// ```
+/// 
+/// Example for a String value:
+/// ```rust
+/// use iroha_data_model::Value;
+/// let test_str_val = Value::String("text".to_owned());
+/// ```
+/// 
+/// Example for a Vec value:
+/// ```rust
+/// use iroha_data_model::Value;
+/// let test_U32_vec_val = Value::Vec(vec![Value::U32(1), Value::U32(2)]);
+/// ```
+/// 
+/// Example for a Name value:
+/// ```rust
+/// use iroha_crypto::{KeyPair, Error};
+/// use iroha_data_model::Value;
+/// let test_name_val = Value::Name("alice".parse().expect("Valid"));
+/// # Ok::<(), Error>(())
+/// ```
+/// 
+/// Example for a PublicKey value:
+/// ```rust
+/// use iroha_crypto::{KeyPair, Error};
+/// use iroha_data_model::Value;
+/// let (public_key_teller, _) = KeyPair::generate()?.into();
+/// let test_pk_val = Value::PublicKey(public_key_teller);
+/// # Ok::<(), Error>(())
+/// ```
 #[derive(
     Debug,
     Clone,
