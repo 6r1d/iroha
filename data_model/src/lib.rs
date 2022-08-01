@@ -396,53 +396,6 @@ impl IdentifiableBox {
 pub type ValueBox = Box<Value>;
 
 /// Sized container for all possible values.
-/// 
-/// Example for a U32 value:
-/// ```rust
-/// use iroha_data_model::Value;
-/// let test_u32_val = Value::U32(1234);
-/// ```
-/// 
-/// Example for a U128 value:
-/// ```rust
-/// use iroha_data_model::Value;
-/// let test_u128_val = Value::U128(1234);
-/// ```
-/// 
-/// Example for a Bool value:
-/// ```rust
-/// use iroha_data_model::Value;
-/// let test_bool_val = Value::Bool(true);
-/// ```
-/// 
-/// Example for a String value:
-/// ```rust
-/// use iroha_data_model::Value;
-/// let test_str_val = Value::String("text".to_owned());
-/// ```
-/// 
-/// Example for a Vec value:
-/// ```rust
-/// use iroha_data_model::Value;
-/// let test_U32_vec_val = Value::Vec(vec![Value::U32(1), Value::U32(2)]);
-/// ```
-/// 
-/// Example for a Name value:
-/// ```rust
-/// use iroha_crypto::{KeyPair, Error};
-/// use iroha_data_model::Value;
-/// let test_name_val = Value::Name("alice".parse().expect("Valid"));
-/// # Ok::<(), Error>(())
-/// ```
-/// 
-/// Example for a PublicKey value:
-/// ```rust
-/// use iroha_crypto::{KeyPair, Error};
-/// use iroha_data_model::Value;
-/// let (public_key_teller, _) = KeyPair::generate()?.into();
-/// let test_pk_val = Value::PublicKey(public_key_teller);
-/// # Ok::<(), Error>(())
-/// ```
 #[derive(
     Debug,
     Clone,
@@ -503,6 +456,139 @@ pub enum Value {
     Block(BlockValueWrapper),
     /// Block headers
     BlockHeader(BlockHeaderValue),
+}
+
+#[cfg(test)]
+mod value_tests {
+    use super::{IdBox};
+    use crate::Value;
+    use crate::fixed::Fixed;
+    use iroha_crypto::{KeyPair, Error};
+    use crate::prelude::Metadata;
+    use crate::IdentifiableBox;
+
+    /// Example for a U32 value
+    #[test]
+    fn u32_value_test() -> Result<(), Error> {
+        Value::U32(1234);
+        Ok(())
+    }
+
+    /// Example for a U128 value
+    #[test]
+    fn u128_value_test() -> Result<(), Error> {
+        Value::U128(1234);
+        Ok(())
+    }
+
+    /// Example for a Bool value:
+    #[test]
+    fn bool_value_test() -> Result<(), Error> {
+        Value::Bool(true);
+        Ok(())
+    }
+
+    /// Example for a String value:
+    #[test]
+    fn string_value_test() -> Result<(), Error> {
+        Value::String("text".to_owned());
+        Ok(())
+    }
+
+    /// Example for a Name value:
+    #[test]
+    fn name_value_test() -> Result<(), Error> {
+        Value::Name("alice".parse().expect("Valid"));
+        Ok(())
+    }
+
+    /// Example for a Fixed value:
+    #[test]
+    fn fixed_value_test() -> Result<(), Error> {
+        let quantity: Fixed = Fixed::try_from(0.42_f64).unwrap();
+        Value::Fixed(quantity);
+        Ok(())
+    }
+
+    /// Example for a Vec value:
+    #[test]
+    fn vec_value_test() -> Result<(), Error> {
+        Value::Vec(vec![Value::U32(1), Value::U32(2)]);
+        Ok(())
+    }
+
+    /// Example for a LimitedMetadata value:
+    #[test]
+    fn limited_metadata_value_test() -> Result<(), Error> {
+        Value::LimitedMetadata(Metadata::default());
+        Ok(())
+    }
+
+    /// Example for an Id value:
+    #[test]
+    fn id_value_test() -> Result<(), Error> {
+        let a_certain_role_id = IdBox::RoleId("a_certain_role_id".parse().expect("Valid"));
+        Value::Id(a_certain_role_id);
+        Ok(())
+    }
+
+    // Example for an Identifiable value for an Account:
+    #[test]
+    fn identifiable_account_value_test() -> Result<(), Error> {
+        use crate::prelude::Account;
+
+        Value::Identifiable(
+            IdentifiableBox::NewAccount(
+                Box::new(
+                    Account::new("alice@wonderland".parse().expect("Valid"), [])
+                )
+            )
+        );
+        Ok(())
+    }
+
+    // Example for an Identifiable value for a domain:
+    #[test]
+    fn identifiable_value_domain_test() -> Result<(), Error> {
+        use crate::prelude::Domain;
+
+        Value::Identifiable(
+            IdentifiableBox::NewDomain(
+                Box::new(
+                    Domain::new("looking_glass".parse().expect("Valid"))
+                )
+            )
+        );
+        Ok(())
+    }
+
+    /// A PublicKey Value example:
+    #[test]
+    fn public_key_value_test() -> Result<(), Error> {
+        let (public_key_teller, _) = KeyPair::generate()?.into();
+        Value::PublicKey(public_key_teller);
+        Ok(())
+    }
+
+    /// A SignatureCheckCondition Value example:
+    #[test]
+    fn scc_value_test() -> Result<(), Error> {
+        use crate::SignatureCheckCondition;
+
+        let condition = SignatureCheckCondition(0_u32.into());
+        Value::SignatureCheckCondition(condition);
+        Ok(())
+    }
+
+    /// Example for a Hash value:
+    #[test]
+    fn hash_value_test() -> Result<(), Error> {
+        use iroha_crypto::Hash;
+        Value::Hash(
+            Hash::prehashed([1_u8; Hash::LENGTH])
+        );
+        Ok(())
+    }
 }
 
 /// Cross-platform wrapper for `BlockValue`.
